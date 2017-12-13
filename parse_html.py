@@ -662,21 +662,16 @@ def parse_product(html, mp, rds):
             reserve_field_5 = ''
 
         # reserve_field_6 & reserve_field_7 其他在售商家和最低价
-        reserve_field_6_7 = sel.xpath('//div[contains(@id, "olp")]/div/span[1]/a/text()')
+        reserve_field_6_7 = sel.xpath('//div[contains(@id, "olp")]/div/span[1]//text()')
         if reserve_field_6_7:
-            if suffix == 'co.jp':  # 日站
-                reserve_field_6 = re.findall(r'\d+', reserve_field_6_7[0])[0]
-                reserve_field_7 = sel.xpath('//div[contains(@id, "olp")]/div/span[1]/span/text()')
-                reserve_field_7 = re.findall(r'\d+', reserve_field_7[0])[0]
+            reserve_field_6_7 = ''.join(reserve_field_6_7)
+            reserve_field_6_7 = re.findall(r'\d+,*\d*\.?\d*', reserve_field_6_7)  # '1,044.74'
+            if len(reserve_field_6_7) > 1:
+                reserve_field_6 = reserve_field_6_7[0]
+                reserve_field_7 = reserve_field_6_7[1].replace(',', '')
             else:
-                reserve_field_6_7 = reserve_field_6_7[0].strip()
-                reserve_field_6_7 = re.findall(r'\d+,*\d*\.?\d*', reserve_field_6_7)  # '1,044.74'
-                if len(reserve_field_6_7) > 1:
-                    reserve_field_6 = reserve_field_6_7[0]
-                    reserve_field_7 = reserve_field_6_7[1].replace(',', '')
-                else:
-                    reserve_field_6 = reserve_field_6_7[0]
-                    reserve_field_7 = 0
+                reserve_field_6 = reserve_field_6_7[0]
+                reserve_field_7 = 0
         else:
             reserve_field_6 = 0
             reserve_field_7 = 0

@@ -10,7 +10,7 @@ import uuid
 import traceback
 from pymysql.err import InterfaceError
 
-store = AmazonStore()
+#store = AmazonStore()
 
 
 def get_html(url):
@@ -470,9 +470,11 @@ def parse_product(html, url):
             generation_time = '%s-%s-%s' % (details[0], details[1], details[2])
         else:
             ymd = ymd[0].strip().replace(',', '').replace('.', '')
+            print(ymd)
             d = re.findall(r'\d{1,2}', ymd)[0]
             y = re.findall(r'\d{4}', ymd)[0]
             m = ymd.replace(y, '').replace(d, '').strip()
+            print(m)
             if suffix == 'es':
                 m = m.replace('de', '').strip()
             month = format_month(m, suffix)
@@ -565,21 +567,16 @@ def parse_product(html, url):
         reserve_field_5 = ''
 
     # reserve_field_6 & reserve_field_7 其他在售商家和最低价
-    reserve_field_6_7 = sel.xpath('//div[contains(@id, "olp")]/div/span[1]/a/text()')
+    reserve_field_6_7 = sel.xpath('//div[contains(@id, "olp")]/div/span[1]//text()')
     if reserve_field_6_7:
-        if suffix == 'co.jp':  # 日站
-            reserve_field_6 = re.findall(r'\d+', reserve_field_6_7[0])[0]
-            reserve_field_7 = sel.xpath('//div[contains(@id, "olp")]/div/span[1]/span/text()')
-            reserve_field_7 = re.findall(r'\d+', reserve_field_7[0])[0]
+        reserve_field_6_7 = ''.join(reserve_field_6_7)
+        reserve_field_6_7 = re.findall(r'\d+,*\d*\.?\d*', reserve_field_6_7)  # '1,044.74'
+        if len(reserve_field_6_7) > 1:
+            reserve_field_6 = reserve_field_6_7[0]
+            reserve_field_7 = reserve_field_6_7[1].replace(',', '')
         else:
-            reserve_field_6_7 = reserve_field_6_7[0].strip()
-            reserve_field_6_7 = re.findall(r'\d+,*\d*\.?\d*', reserve_field_6_7)  # '1,044.74'
-            if len(reserve_field_6_7) > 1:
-                reserve_field_6 = reserve_field_6_7[0]
-                reserve_field_7 = reserve_field_6_7[1].replace(',', '')
-            else:
-                reserve_field_6 = reserve_field_6_7[0]
-                reserve_field_7 = 0
+            reserve_field_6 = reserve_field_6_7[0]
+            reserve_field_7 = 0
     else:
         reserve_field_6 = 0
         reserve_field_7 = 0
@@ -622,8 +619,8 @@ def parse_product(html, url):
 
 def format_month(m, suffix):
     month = Month[suffix]['month']
-    for index, it in enumerate(month):
-        if m.lower() == it.lower():
+    for index, item in enumerate(month):
+        if item.lower().startswith(m.lower()):
             return index+1
 
 
@@ -635,5 +632,5 @@ def main(url, entry, flag=1):   # flag确定是否重新下载
 
 if __name__ == '__main__':
     l = 'https://www.amazon.com/gp/bestsellers/automotive/15737391/ref=pd_zg_hrsr_automotive_3_5_last'
-    d = 'https://www.amazon.com/dp/B00SYHWUF4'
+    d = 'https://www.amazon.co.uk/dp/B00GRIR87M'
     main(d, 'd', 1)
