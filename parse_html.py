@@ -41,6 +41,15 @@ def choose_parse(html, mp, rds):
     category_url = mapping.get('category_url', None)
     sel = etree.HTML(html)
     if entry in (ListTag, KeyWordTag):
+
+        if entry == KeyWordTag:
+            redirect = sel.xpath('//div[@id="apsRedirectLink"]')
+            if redirect:
+                if not category_url:
+                    mark_fail_task(rds)
+                collect_error(mp, rds, error='keyword_redirect')
+                return
+
         items = sel.xpath('//ul[starts-with(@class, "s-result")]/li[@data-asin]')
         if items:
             parse_list(html, mp, rds)
@@ -125,7 +134,11 @@ def parse_list(html, mp, rds):
             try:
                 original_price = pl.xpath('.//span[contains(@aria-label, "Suggested Retail Price")]/text()')
                 if original_price:
-                    original_price = ''.join(original_price[0]).replace('from', '').replace(sign, '').replace(',', '').replace(currency, '')
+                    original_price = ''.join(original_price[0]).replace('from', '').replace(sign, '').replace(currency, '').replace(' ', '').replace('\xa0', '')
+                    if currency == 'EUR':
+                        original_price = original_price.replace('.', '').replace(',', '.')
+                    else:
+                        original_price = original_price.replace(',', '')
                 else:
                     original_price = 0
                 price_1 = pl.xpath('.//span[contains(@class, "a-size-small s-padding-right-micro")]/text()')
@@ -150,7 +163,11 @@ def parse_list(html, mp, rds):
                     price = 0
                 max_price = 0
                 if price != 0:
-                    price = ''.join(price).replace('from', '').replace(sign, '').replace(',', '').replace(currency, '')
+                    price = ''.join(price).replace('from', '').replace(sign, '').replace(currency, '')
+                    if currency == 'EUR':
+                        price = price.replace('.', '').replace(',', '.')
+                    else:
+                        price = price.replace(',', '')
                     if '-' in price:
                         price, max_price = [p.strip() for p in price.split('-')]
 
@@ -232,8 +249,12 @@ def parse_top(html, mp, rds):
 
             try:
                 price_1 = pl.xpath('.//span[starts-with(@class, "a-size-base a-color-price")]/span/text()')
-                if len(price_1) > 0:
-                    _price = ''.join(price_1).replace(sign, '').replace(',', '').replace(' ', '').replace(currency, '')
+                if price_1:
+                    _price = ''.join(price_1).replace(sign, '').replace(currency, '').replace(' ', '').replace('\xa0', '')
+                    if currency == 'EUR':
+                        _price = _price.replace('.', '').replace(',', '.')
+                    else:
+                        _price = _price.replace(',', '')
                     if '-' in _price:
                         price, max_price = [p.strip() for p in _price.split('-')]
                         price = ''.join(re.findall(r'\d+\.?\d*', price))
@@ -285,6 +306,17 @@ def parse_product(html, mp, rds):
     list_rank = mapping.get('rank', 0)
     search_box = mapping.get('search_box', '')
 
+    if category_entry == 2:
+        tags = 'List'
+    elif category_entry == 3:
+        tags = 'KeyWord'
+    elif category_entry == 4:
+        tags = 'BestSellers'
+    elif category_entry == 5:
+        tags = 'NewReleases'
+    else:
+        tags = 'Detail'
+
     sel = etree.HTML(html)
     try:
         # first_title 商品详情页显示的分类
@@ -311,42 +343,6 @@ def parse_product(html, mp, rds):
         # product_url
         product_url = page_url
 
-        # asin
-        asin_1 = sel.xpath('//th[contains(text(), "ASIN:")]/../*[2]/text()')
-        asin_2 = sel.xpath('//td[contains(text(), "ASIN:")]/../*[2]/text()')
-        asin_3 = sel.xpath('//b[contains(text(), "ASIN:")]/../text()')
-        asin_4 = sel.xpath('//span[contains(text(), "ASIN:")]/../*[2]/text()')
-        if asin_1:
-            asin = asin_1
-        elif asin_2:
-            asin = asin_2
-        elif asin_3:
-            asin = asin_3
-        elif asin_4:
-            asin = asin_4
-        else:
-            asin = ''
-        if asin:
-            asin = asin[0].strip()
-        url_id = asin
-
-        # brand
-        brand_1 = sel.xpath('//a[@id="bylineInfo"]/text()')
-        brand_2 = sel.xpath('//a[@id="brand"]/text()')  # 日站
-        brand_3 = sel.xpath('//th[contains(text(), "Brand")]')
-        if brand_1:
-            brand = brand_1[0].strip()
-        elif brand_2:
-            brand = brand_2[0].strip()
-        elif brand_3:
-            brand = brand_3[0].xpath('./../td/text()')
-            if brand:
-                brand = brand[0].strip()
-            else:
-                brand = ''
-        else:
-            brand = ''
-
         # name
         title_1 = sel.xpath('//span[@id="productTitle"]/text()')
         title_2 = sel.xpath('//div[@id="title_feature_div"]/h1/text()')
@@ -368,8 +364,46 @@ def parse_product(html, mp, rds):
             _name = title_6[0].strip()
         else:
             rds.remove_member(CrawlUrls, mp)
-            collect_error(mp, rds, error='No product name')
+            # collect_error(mp, rds, error='No product name')
             return
+
+        # asin
+        asin_1 = sel.xpath('//th[contains(text(), "ASIN:")]/../*[2]/text()')
+        asin_2 = sel.xpath('//td[contains(text(), "ASIN:")]/../*[2]/text()')
+        asin_3 = sel.xpath('//b[contains(text(), "ASIN:")]/../text()')
+        asin_4 = sel.xpath('//span[contains(text(), "ASIN:")]/../*[2]/text()')
+        if asin_1:
+            asin = asin_1
+        elif asin_2:
+            asin = asin_2
+        elif asin_3:
+            asin = asin_3
+        elif asin_4:
+            asin = asin_4
+        else:
+            asin = ''
+        if asin:
+            asin = asin[0].strip()
+            if len(asin) > 10:
+                asin = ''
+        url_id = asin
+
+        # brand
+        brand_1 = sel.xpath('//a[@id="bylineInfo"]/text()')
+        brand_2 = sel.xpath('//a[@id="brand"]/text()')  # 日站
+        brand_3 = sel.xpath('//th[contains(text(), "Brand")]')
+        if brand_1:
+            brand = brand_1[0].strip()
+        elif brand_2:
+            brand = brand_2[0].strip()
+        elif brand_3:
+            brand = brand_3[0].xpath('./../td/text()')
+            if brand:
+                brand = brand[0].strip()
+            else:
+                brand = ''
+        else:
+            brand = ''
 
         # discount
         discount = sel.xpath('//*[contains(@id, "price_savings")]/*[2]/text()')
@@ -387,17 +421,30 @@ def parse_product(html, mp, rds):
         # original_price
         original_price = sel.xpath('//div[@id="price"]//span[@class="a-text-strike"]/text()')
         if original_price:
-            original_price = original_price[0].strip().replace(sign, '').replace(',', '').replace(' ', '').replace(currency, '')
+            original_price = original_price[0].strip().replace(sign, '').replace(currency, '').replace(' ', '').replace('\xa0', '')
+            if currency == 'EUR':
+                original_price = original_price.replace('.', '').replace(',', '.')
+            else:
+                original_price = original_price.replace(',', '')
         else:
             original_price = mapping.get('original_price', 0)
 
+        try:
+            original_price = float(original_price)
+        except ValueError:
+            original_price = 0
+
         # price & max_price
-        price = sel.xpath('//span[contains(@id, "priceblock")]/text()')
-        price_1 = sel.xpath('//div[@id="centerCol"]//span[@id="color_name_1_price"]/span/text()')
-        price_2 = sel.xpath('//span[@id="actualPriceValue"]/text()')
-        # price_3 = sel.xpath('//span[@class="olp-padding-right"]/span[@class="a-color-price"]/text()')
-        if price:
-            price = price[0].strip().replace(sign, '').replace(',', '').replace(' ', '').replace(currency, '')
+        price_1 = sel.xpath('//span[contains(@id, "priceblock")]/text()')
+        price_2 = sel.xpath('//div[@id="centerCol"]//span[@id="color_name_1_price"]/span/text()')
+        price_3 = sel.xpath('//span[@id="actualPriceValue"]/text()')
+        price_4 = sel.xpath('//span[contains(@id, "priceblock")]/span[contains(@class, "buyingPrice")]/text()')
+        if price_1 and price_1[0].strip():
+            price = price_1[0].strip().replace(sign, '').replace(currency, '').replace(' ', '').replace('\xa0', '')
+            if currency == 'EUR':
+                price = price.replace('.', '').replace(',', '.')
+            else:
+                price = price.replace(',', '')
             if '-' in price:
                 price, max_price = [p.strip() for p in price.split('-')]
                 price = re.findall(r'\d+\.?\d*', price)
@@ -412,20 +459,42 @@ def parse_product(html, mp, rds):
                     max_price = 0
             else:
                 max_price = 0
-        elif price_1:
-            price = ''.join(price_1).replace(sign, '').replace(',', '').replace(' ', '').replace(currency, '')
+        elif price_2:
+            price = ''.join(price_2).replace(sign, '').replace(currency, '').replace(' ', '').replace('\xa0', '')
+            if currency == 'EUR':
+                price = price.replace('.', '').replace(',', '.')
+            else:
+                price = price.replace(',', '')
             price = re.findall(r'\d+\.?\d*', price)
             if price:
                 price = ''.join(price)
             else:
                 price = 0
             max_price = 0
-        elif price_2:
-            price = price_2[0].strip().replace(sign, '').replace(currency, '')
+        elif price_3:
+            price = price_3[0].strip().replace(sign, '')
+            max_price = 0
+        elif price_4:
+            price_bg = price_4[0].strip()
+            price_sm = '00'
+            price_pd = sel.xpath(
+                '//span[contains(@id, "priceblock")]/span[contains(@class, "priceToPayPadding")]/text()')
+            if price_pd:
+                price_sm = price_pd[0].strip()
+            price = '{}.{}'.format(price_bg, price_sm)
             max_price = 0
         else:
             price = mapping.get('price', 0)
             max_price = mapping.get('max_price', 0)
+
+        try:
+            price = float(price)
+        except ValueError:
+            price = 0
+        try:
+            max_price = float(max_price)
+        except ValueError:
+            max_price = 0
 
         # grade_count
         _grade_count = sel.xpath('//span[@id="acrPopover"]/@title')
@@ -436,6 +505,10 @@ def parse_product(html, mp, rds):
                 grade_count = _grade_count[0].split(' ')[0]
         else:
             grade_count = 0
+        try:
+            grade_count = float(grade_count)
+        except ValueError:
+            grade_count = 0
 
         # review_count
         _review_count = sel.xpath('//span[@id="acrCustomerReviewText"]/text()')
@@ -444,6 +517,10 @@ def parse_product(html, mp, rds):
             review_count = re.findall(r'(\d+)', _review_count)[0]
         else:
             review_count = 0
+        try:
+            review_count = int(review_count)
+        except ValueError:
+            review_count = 0
 
         # questions
         _questions = sel.xpath('//a[@id="askATFLink"]/span/text()')
@@ -451,6 +528,11 @@ def parse_product(html, mp, rds):
             _questions = _questions[0].strip().replace('+', '').replace(',', '')
             questions = re.findall(r'\d+', _questions)[0]
         else:
+            questions = 0
+
+        try:
+            questions = int(questions)
+        except ValueError:
             questions = 0
 
         # attribute
@@ -602,7 +684,8 @@ def parse_product(html, mp, rds):
 
         # all_rank
         all_rank_1 = sel.xpath('.//*[contains(text(), "Best Sellers Rank")]/../*[2]/span/span')
-        all_rank_2 = sel.xpath('//li[@id="SalesRank"]')
+        all_rank_2 = sel.xpath('//li[@id="SalesRank"]') if sel.xpath('//li[@id="SalesRank"]') \
+            else sel.xpath('//tr[@id="SalesRank"]/td[@class="value"]')
         if all_rank_1:
             all_rank_list = []
             for rk in all_rank_1:
@@ -634,13 +717,21 @@ def parse_product(html, mp, rds):
 
         # tech
         tech_detail = dict()
-        tech = sel.xpath('//table[@id="productDetails_techSpec_section_1"]//tr')
-        if tech:
-            for tt in tech:
-                k = tt.xpath('./th/text()')[0].strip()
-                v = tt.xpath('./td/text()')[0].strip()
-                if k:
-                    tech_detail[k] = v
+        tech_1 = sel.xpath('//table[@id="productDetails_techSpec_section_1"]//tr')
+        tech_2 = sel.xpath('//div[@id="prodDetails"]//table')
+        if tech_1:
+            for tt in tech_1:
+                k = tt.xpath('./th/text()')
+                v = tt.xpath('./td/text()')
+                if k and k:
+                    tech_detail[k[0].strip()] = v[0].strip()
+        elif tech_2:
+            trs = tech_2[0].xpath('.//tr')
+            for tr in trs:
+                k = tr.xpath('./td[@class="label"]/text()')
+                v = tr.xpath('./td[@class="value"]/text()')
+                if k and v:
+                    tech_detail[k[0].strip()] = v[0].strip()
         if tech_detail:
             tech_detail = json.dumps(tech_detail, ensure_ascii=False)
         else:
@@ -662,18 +753,36 @@ def parse_product(html, mp, rds):
             reserve_field_5 = ''
 
         # reserve_field_6 & reserve_field_7 其他在售商家和最低价
-        reserve_field_6_7 = sel.xpath('//div[contains(@id, "olp")]/div/span[1]//text()')
+        reserve_field_6_7_1 = sel.xpath('//div[contains(@id, "olp")]/div/span[1]//text()')
+        reserve_field_6_7_2 = sel.xpath('//div[@id="mbc"]//h5[1]/span//text()')
+        reserve_field_6_7 = reserve_field_6_7_1 if reserve_field_6_7_1 else reserve_field_6_7_2
         if reserve_field_6_7:
-            reserve_field_6_7 = ''.join(reserve_field_6_7)
-            reserve_field_6_7 = re.findall(r'\d+,*\d*\.?\d*', reserve_field_6_7)  # '1,044.74'
+            reserve_field_6_7 = ''.join(reserve_field_6_7).replace(sign, '').replace(currency, '').replace(' ', '').replace('\xa0', '')
+            reserve_field_6_7 = re.findall(r'\d+\.?\d*,*\d*\.?\d*', reserve_field_6_7)
             if len(reserve_field_6_7) > 1:
                 reserve_field_6 = reserve_field_6_7[0]
-                reserve_field_7 = reserve_field_6_7[1].replace(',', '')
-            else:
+                reserve_field_7 = reserve_field_6_7[1]
+                if currency == 'EUR':
+                    reserve_field_7 = reserve_field_7.replace('.', '').replace(',', '.')
+                else:
+                    reserve_field_7 = reserve_field_7.replace(',', '')
+            elif reserve_field_6_7:
                 reserve_field_6 = reserve_field_6_7[0]
+                reserve_field_7 = 0
+            else:
+                reserve_field_6 = 0
                 reserve_field_7 = 0
         else:
             reserve_field_6 = 0
+            reserve_field_7 = 0
+
+        try:
+            reserve_field_6 = int(reserve_field_6)
+        except ValueError:
+            reserve_field_6 = 0
+        try:
+            reserve_field_7 = float(reserve_field_7)
+        except ValueError:
             reserve_field_7 = 0
 
         create_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
@@ -705,16 +814,6 @@ def parse_product(html, mp, rds):
         sales_total = mapping.get('result_count', '')
         total_inventory = ''
         favornum = list_rank
-        if category_entry == 2:
-            tags = 'List'
-        elif category_entry == 3:
-            tags = 'KeyWord'
-        elif category_entry == 4:
-            tags = 'BestSellers'
-        elif category_entry == 5:
-            tags = 'NewReleases'
-        else:
-            tags = 'Detail'
         platform = 'amazon'
         platform_url = suffix
         status = 0

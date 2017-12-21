@@ -47,7 +47,8 @@ async def req_http(mp):
                         choose_parse(html, mp, RedisA)
                 elif resp.status == 404:
                     print('404')
-                    collect_error(mp, RedisA, error='404')
+                    RedisA.remove_member(CrawlUrls, mp)
+                    # collect_error(mp, RedisA, error='404')
                     if not category_entry:
                         if RedisA.exists_key(OneTask):
                             task_id = RedisA.get_hash_field(OneTask, 'task_id')

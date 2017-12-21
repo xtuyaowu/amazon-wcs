@@ -55,9 +55,9 @@ def scan_database():
     else:
         sql_select = (
             "select wtc_id, wtc_task_type, wtc_task_frequency, wtc_task_period, wtc_task_info,wtc_task_category," 
-            "wtc_task_product_id, wtc_task_site from crawler_wcs_task_center where wtc_platform=%s and wtc_status=%s "
-            "limit 1")
-        rows_0 = store.execute_sql(sql_select, 'amazon', 0)
+            "wtc_task_product_id, wtc_task_site from crawler_wcs_task_center where wtc_status=%s and wtc_platform=%s"
+            "and wtc_is_delete=%s limit 1")
+        rows_0 = store.execute_sql(sql_select, 0, 'amazon', 0)
 
     if rows_0:
         row_dct = rows_0[0]
@@ -146,6 +146,8 @@ def scan_database():
             return
         change_status(1, task_id)
         RedisA.rc.rpush(StartUrls, mp)
+        # 昊旻测试用
+        RedisA.rc.rpush('amz_test', mp)
         update_proxy_ip(Que)
     else:
         # 循环采集
@@ -154,9 +156,9 @@ def scan_database():
         else:
             sql_select_track = (
                 "select wtc_id, wtc_task_type, wtc_task_frequency, wtc_task_period, wtc_task_info,wtc_task_category,"
-                "wtc_task_product_id, wtc_task_site from crawler_wcs_task_center where wtc_platform=%s"
-                "and wtc_status=%s ")
-            rows_1 = store.execute_sql(sql_select_track, 'amazon', 1)
+                "wtc_task_product_id, wtc_task_site from crawler_wcs_task_center where wtc_status=%s and "
+                "wtc_platform=%s and wtc_is_delete=%s")
+            rows_1 = store.execute_sql(sql_select_track, 1, 'amazon', 0)
 
         for row_1 in rows_1:
             row_dct = row_1
@@ -190,6 +192,7 @@ def scan_database():
                 now_time = datetime.datetime.strptime(time.strftime("%Y-%m-%d %H:%M:%S"), "%Y-%m-%d %H:%M:%S")
                 if next_track_time > end_track_time:
                     change_status(2, task_id)
+                    RedisA.delete_key(key)
                 if now_time > next_track_time:
                     page_url = task_info.strip()
                     mp = {'entry': task_type, 'page_url': page_url, 'task_id': task_id}

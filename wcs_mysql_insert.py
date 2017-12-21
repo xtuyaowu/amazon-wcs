@@ -30,8 +30,6 @@ def data_insert(rds):
         while rds.exists_key(MysqlDataList):
             item = rds.rc.rpop(MysqlDataList)
             item_json = json.loads(item)
-            print(type(item_json))
-            print(item_json)
             table = item_json['table']
             print(table)
             data = item_json['data']

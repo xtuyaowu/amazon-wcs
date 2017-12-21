@@ -2,7 +2,7 @@
 import pymysql
 
 MYSQL_CONFIG_SERVER = {
-    'host': '10.28.178.68',  # 10.28.178.68
+    'host': '47.90.32.89',  # 10.28.178.68
     'port': 3306,
     'user': 'bgpc',
     'passwd': 'bgpc1qaz@WSX',

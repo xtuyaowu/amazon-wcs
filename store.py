@@ -100,8 +100,8 @@ class RedisCluster:
 class AmazonStorePro:
     def __init__(self):
         try:
-            #self.conn = pymysql.connect(**MYSQL_CONFIG_LOCAL)
-            self.conn = pymysql.connect(**MYSQL_CONFIG_SERVER)
+            self.conn = pymysql.connect(**MYSQL_CONFIG_LOCAL)
+            #self.conn = pymysql.connect(**MYSQL_CONFIG_SERVER)
         except:
             traceback.print_exc()
             sys.exit()
@@ -118,58 +118,6 @@ class AmazonStorePro:
                 self.conn.commit()
             else:
                 print('no where')
-
-    def close(self):
-        cursor = self.conn.cursor()
-        cursor.close()
-        self.conn.close()
-
-
-class AmazonStore:
-    def __init__(self):
-        try:
-            #self.conn = pymysql.connect(**MYSQL_CONFIG_LOCAL)
-            self.conn = pymysql.connect(**MYSQL_CONFIG_SERVER)
-        except:
-            traceback.print_exc()
-            sys.exit()
-
-    def insert_amazon_sku(self, table_name, _uuid, products_id, url_id, brand, product_url, _name, first_title,
-                          second_title, original_price, price, max_price, discount, dispatch, shipping, currency,
-                          attribute, version_urls, review_count, grade_count, sales_total, total_inventory, favornum,
-                          image_url, extra_image_urls, description, category, category_url, tags, shop_name, shop_url,
-                          generation_time, platform, platform_url, crawl_time, create_time, status, questions,
-                          is_delete, reserve_field_1, reserve_field_2, reserve_field_3, reserve_field_4,
-                          reserve_field_5, reserve_field_6, reserve_field_7):
-        sql = (
-            "insert into {}(scgs_uuid, scgs_products_id, scgs_url_id, scgs_brand, scgs_product_url, scgs_name,"
-            "scgs_firstTitle, scgs_secondTitle, scgs_original_price, scgs_price, scgs_max_price, scgs_discount," 
-            "scgs_dispatch, scgs_shipping, scgs_currency, scgs_attribute, scgs_version_urls, scgs_review_count," 
-            "scgs_grade_count, scgs_sales_total, scgs_total_inventory, scgs_favornum, scgs_image_url," 
-            "scgs_extra_image_urls, scgs_description, scgs_category, scgs_category_url, scgs_tags, scgs_shop_name, " 
-            "scgs_shop_url, scgs_generation_time, scgs_platform, scgs_platform_url, scgs_crawl_time, scgs_create_time, " 
-            "scgs_status, scgs_questions, scgs_is_delete, scgs_reserve_field_1, scgs_reserve_field_2," 
-            "scgs_reserve_field_3, scgs_reserve_field_4, scgs_reserve_field_5, scgs_reserve_field_6,"
-            "scgs_reserve_field_7)values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,"
-            "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)").format(table_name)
-        cur = self.conn.cursor()
-        cur.execute(sql, (_uuid, products_id, url_id, brand, product_url, _name, first_title, second_title,
-                          original_price, price, max_price, discount, dispatch, shipping, currency, attribute,
-                          version_urls, review_count, grade_count, sales_total, total_inventory, favornum, image_url,
-                          extra_image_urls, description, category, category_url, tags, shop_name, shop_url,
-                          generation_time, platform, platform_url, crawl_time, create_time, status, questions,
-                          is_delete, reserve_field_1, reserve_field_2, reserve_field_3, reserve_field_4,
-                          reserve_field_5, reserve_field_6, reserve_field_7))
-        self.conn.commit()
-
-    def insert_wcs_task_relevance(self, sku_uuid, sku_rank, sku_url, task_id, task_type, task_info, platform):
-        sql = (
-            "insert into crawler_wcs_task_relevance(wtr_sku_uuid, wtr_sku_rank, wtr_sku_url, wtr_task_id,"
-            "wtr_task_type, wtr_task_info, wtr_platform, wtr_crawl_time, wtr_create_time)values"
-            "(%s, %s,%s,%s,%s,%s,%s,curdate(),now())")
-        cur = self.conn.cursor()
-        cur.execute(sql, (sku_uuid, sku_rank, sku_url, task_id, task_type, task_info, platform))
-        self.conn.commit()
 
     def close(self):
         cursor = self.conn.cursor()
