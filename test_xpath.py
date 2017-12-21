@@ -5,12 +5,12 @@ import requests
 from settings import HEADERS
 import random
 import json
-from store import AmazonStore
+from store import AmazonStorePro
 import uuid
 import traceback
 from pymysql.err import InterfaceError
 
-#store = AmazonStore()
+#store = AmazonStorePro()
 
 
 def get_html(url):
@@ -52,6 +52,7 @@ def parse_list(html, url):
     domain = SiteType[suffix]
     sign = domain['sign']
     site = domain['site']
+    currency = domain['currency']
     sel = etree.HTML(html)
     # category
     category = sel.xpath('//*[@id="s-result-count"]/span/*/text()')
@@ -91,7 +92,11 @@ def parse_list(html, url):
             comments = 0
         original_price = pl.xpath('.//span[contains(@aria-label, "Suggested Retail Price")]/text()')
         if original_price:
-            original_price = ''.join(original_price[0]).replace('from', '').replace(sign, '').replace(',', '')
+            original_price = ''.join(original_price[0]).replace('from', '').replace(sign, '').replace(currency, '').replace(' ', '').replace('\xa0', '')
+            if currency == 'EUR':
+                original_price = original_price.replace('.', '').replace(',', '.')
+            else:
+                original_price = original_price.replace(',', '')
         else:
             original_price = 0
         price_1 = pl.xpath('.//span[contains(@class, "a-size-small s-padding-right-micro")]/text()')
@@ -115,7 +120,12 @@ def parse_list(html, url):
             price = 0
         max_price = 0
         if price != 0:
-            price = ''.join(price).replace('from', '').replace(sign, '').replace(',', '')
+            price = ''.join(price).replace('from', '').replace(sign, '')
+            if currency == 'EUR':
+                price = price.replace('.', '').replace(',', '.')
+            else:
+                price = price.replace(',', '')
+
             if '-' in price:
                 price, max_price = [p.strip() for p in price.split('-')]
         try:
@@ -159,21 +169,14 @@ def parse_top(html, url):
                 rank = rank[0].strip().replace('.', '')
             else:
                 rank = 0
-
-            # 插入关联表
-            product_url = 'https://www.amazon.{}/dp/{}'.format(suffix, asin)
-            _uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, asin + suffix)).replace('-', '')
-            try:
-                store.insert_wcs_task_relevance(_uuid, rank, product_url, task_id, entry, category, 'amazon')
-            except InterfaceError:
-                print('InterfaceError')
-                store.conn.ping()
-            except:
-                traceback.print_exc()
             try:
                 price_1 = pl.xpath('.//span[starts-with(@class, "a-size-base a-color-price")]/span/text()')
                 if len(price_1) > 0:
-                    _price = ''.join(price_1).replace(sign, '').replace(',', '').replace(' ', '').replace(currency, '')
+                    _price = ''.join(price_1).replace(sign, '').replace(currency, '').replace(' ', '').replace('\xa0', '')
+                    if currency == 'EUR':
+                        _price = _price.replace('.', '').replace(',', '.')
+                    else:
+                        _price = _price.replace(',', '')
                     if '-' in _price:
                         price, max_price = [p.strip() for p in _price.split('-')]
                         price = ''.join(re.findall(r'\d+\.?\d*', price))
@@ -191,6 +194,7 @@ def parse_top(html, url):
             except:
                 price = 0
                 max_price = 0
+            print(asin, rank, price, max_price)
 
     current_page = sel.xpath('//ol[starts-with(@class, "zg_pagination")]/li[contains(@class, "zg_page zg_selected")]/a/@page')
     if current_page:
@@ -243,6 +247,8 @@ def parse_product(html, url):
         asin = ''
     if asin:
         asin = asin[0].strip()
+        if len(asin) > 10:
+            asin = ''
     url_id = asin
 
     # brand
@@ -292,17 +298,30 @@ def parse_product(html, url):
     # original_price
     original_price = sel.xpath('//div[@id="price"]//span[@class="a-text-strike"]/text()')
     if original_price:
-        original_price = original_price[0].strip().replace(sign, '').replace(',', '').replace(' ', '')
+        original_price = original_price[0].strip().replace(sign, '').replace(currency, '').replace(' ', '').replace('\xa0', '')
+        if currency == 'EUR':
+            original_price = original_price.replace('.', '').replace(',', '.')
+        else:
+            original_price = original_price.replace(',', '')
     else:
         original_price = 0
 
+    try:
+        original_price = float(original_price)
+    except ValueError:
+        original_price = 0
+
     # price & max_price
-    price = sel.xpath('//span[contains(@id, "priceblock")]/text()')
-    price_1 = sel.xpath('//div[@id="centerCol"]//span[@id="color_name_1_price"]/span/text()')
-    price_2 = sel.xpath('//span[@id="actualPriceValue"]/text()')
-    # price_3 = sel.xpath('//span[@class="olp-padding-right"]/span[@class="a-color-price"]/text()')
-    if price and price[0].strip().startswith(sign):
-        price = price[0].strip().replace(sign, '').replace(',', '').replace(' ', '')
+    price_1 = sel.xpath('//span[contains(@id, "priceblock")]/text()')
+    price_2 = sel.xpath('//div[@id="centerCol"]//span[@id="color_name_1_price"]/span/text()')
+    price_3 = sel.xpath('//span[@id="actualPriceValue"]/text()')
+    price_4 = sel.xpath('//span[contains(@id, "priceblock")]/span[contains(@class, "buyingPrice")]/text()')
+    if price_1 and price_1[0].strip():
+        price = price_1[0].strip().replace(sign, '').replace(currency, '').replace(' ', '').replace('\xa0', '')
+        if currency == 'EUR':
+            price = price.replace('.', '').replace(',', '.')
+        else:
+            price = price.replace(',', '')
         if '-' in price:
             price, max_price = [p.strip() for p in price.split('-')]
             price = re.findall(r'\d+\.?\d*', price)
@@ -317,19 +336,40 @@ def parse_product(html, url):
                 max_price = 0
         else:
             max_price = 0
-    elif price_1:
-        price = ''.join(price_1).replace(sign, '').replace(',', '').replace(' ', '')
+    elif price_2:
+        price = ''.join(price_2).replace(sign, '').replace(currency, '').replace(' ', '').replace('\xa0', '')
+        if currency == 'EUR':
+            price = price.replace('.', '').replace(',', '.')
+        else:
+            price = price.replace(',', '')
         price = re.findall(r'\d+\.?\d*', price)
         if price:
             price = ''.join(price)
         else:
             price = 0
         max_price = 0
-    elif price_2:
-        price = price_2[0].strip().replace(sign, '')
+    elif price_3:
+        price = price_3[0].strip().replace(sign, '')
+        max_price = 0
+    elif price_4:
+        price_bg = price_4[0].strip()
+        price_sm = '00'
+        price_pd = sel.xpath('//span[contains(@id, "priceblock")]/span[contains(@class, "priceToPayPadding")]/text()')
+        if price_pd:
+            price_sm = price_pd[0].strip()
+        price = '{}.{}'.format(price_bg, price_sm)
         max_price = 0
     else:
         price = 0
+        max_price = 0
+
+    try:
+        price = float(price)
+    except ValueError:
+        price = 0
+    try:
+        max_price = float(max_price)
+    except ValueError:
         max_price = 0
 
     # grade_count
@@ -420,7 +460,6 @@ def parse_product(html, url):
     _extra_image_urls = sel.xpath('//div[@id="altImages"]')
     if _extra_image_urls:
         _extra_image_urls = _extra_image_urls[0].xpath('ul/li//img/@src')
-        print(_extra_image_urls)
         for url in _extra_image_urls:
             if '.jpg' in url:
                 image_url = re.findall(r'(.+)\._?.+\.jpg', url)[0] + '.jpg'
@@ -470,11 +509,9 @@ def parse_product(html, url):
             generation_time = '%s-%s-%s' % (details[0], details[1], details[2])
         else:
             ymd = ymd[0].strip().replace(',', '').replace('.', '')
-            print(ymd)
             d = re.findall(r'\d{1,2}', ymd)[0]
             y = re.findall(r'\d{4}', ymd)[0]
             m = ymd.replace(y, '').replace(d, '').strip()
-            print(m)
             if suffix == 'es':
                 m = m.replace('de', '').strip()
             month = format_month(m, suffix)
@@ -508,7 +545,8 @@ def parse_product(html, url):
 
     # all_rank
     all_rank_1 = sel.xpath('.//*[contains(text(), "Best Sellers Rank")]/../*[2]/span/span')
-    all_rank_2 = sel.xpath('//li[@id="SalesRank"]')
+    all_rank_2 = sel.xpath('//li[@id="SalesRank"]') if sel.xpath('//li[@id="SalesRank"]') \
+        else sel.xpath('//tr[@id="SalesRank"]/td[@class="value"]')
     if all_rank_1:
         all_rank_list = []
         for rk in all_rank_1:
@@ -540,13 +578,21 @@ def parse_product(html, url):
 
     # tech
     tech_detail = dict()
-    tech = sel.xpath('//table[@id="productDetails_techSpec_section_1"]//tr')
-    if tech:
-        for tt in tech:
-            k = tt.xpath('./th/text()')[0].strip()
-            v = tt.xpath('./td/text()')[0].strip()
-            if k:
-                tech_detail[k] = v
+    tech_1 = sel.xpath('//table[@id="productDetails_techSpec_section_1"]//tr')
+    tech_2 = sel.xpath('//div[@id="prodDetails"]//table')
+    if tech_1:
+        for tt in tech_1:
+            k = tt.xpath('./th/text()')
+            v = tt.xpath('./td/text()')
+            if k and k:
+                tech_detail[k[0].strip()] = v[0].strip()
+    elif tech_2:
+        trs = tech_2[0].xpath('.//tr')
+        for tr in trs:
+            k = tr.xpath('./td[@class="label"]/text()')
+            v = tr.xpath('./td[@class="value"]/text()')
+            if k and v:
+                tech_detail[k[0].strip()] = v[0].strip()
     if tech_detail:
         tech_detail = json.dumps(tech_detail, ensure_ascii=False)
     else:
@@ -567,18 +613,35 @@ def parse_product(html, url):
         reserve_field_5 = ''
 
     # reserve_field_6 & reserve_field_7 其他在售商家和最低价
-    reserve_field_6_7 = sel.xpath('//div[contains(@id, "olp")]/div/span[1]//text()')
+    reserve_field_6_7_1 = sel.xpath('//div[contains(@id, "olp")]/div/span[1]//text()')
+    reserve_field_6_7_2 = sel.xpath('//div[@id="mbc"]//h5[1]/span//text()')
+    reserve_field_6_7 = reserve_field_6_7_1 if reserve_field_6_7_1 else reserve_field_6_7_2
     if reserve_field_6_7:
-        reserve_field_6_7 = ''.join(reserve_field_6_7)
-        reserve_field_6_7 = re.findall(r'\d+,*\d*\.?\d*', reserve_field_6_7)  # '1,044.74'
+        reserve_field_6_7 = ''.join(reserve_field_6_7).replace(sign, '').replace(currency, '').replace(' ', '').replace('\xa0', '')
+        reserve_field_6_7 = re.findall(r'\d+\.?\d*,*\d*\.?\d*', reserve_field_6_7)
         if len(reserve_field_6_7) > 1:
             reserve_field_6 = reserve_field_6_7[0]
-            reserve_field_7 = reserve_field_6_7[1].replace(',', '')
-        else:
+            reserve_field_7 = reserve_field_6_7[1]
+            if currency == 'EUR':
+                reserve_field_7 = reserve_field_7.replace('.', '').replace(',', '.')
+            else:
+                reserve_field_7 = reserve_field_7.replace(',', '')
+        elif reserve_field_6_7:
             reserve_field_6 = reserve_field_6_7[0]
+            reserve_field_7 = 0
+        else:
+            reserve_field_6 = 0
             reserve_field_7 = 0
     else:
         reserve_field_6 = 0
+        reserve_field_7 = 0
+    try:
+        reserve_field_6 = int(reserve_field_6)
+    except ValueError:
+        reserve_field_6 = 0
+    try:
+        reserve_field_7 = float(reserve_field_7)
+    except ValueError:
         reserve_field_7 = 0
 
     # shop_name & shop_url
@@ -590,6 +653,8 @@ def parse_product(html, url):
         shop_name = ''
         shop_url = ''
 
+    _uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, asin + suffix)).replace('-', '')
+    print('uuid: {}'.format(_uuid))
     print('first_title: {}'.format(first_title))
     print('asin: {}'.format(url_id))
     print('brand: {}'.format(brand))
@@ -615,6 +680,8 @@ def parse_product(html, url):
     print('reserve_field_7: {}'.format(reserve_field_7))
     print('shop_name: {}'.format(shop_name))
     print('shop_url: {}'.format(shop_url))
+    sql = 'insert into t(d)values(%s)'
+    #store.execute_sql(sql, description)
 
 
 def format_month(m, suffix):
@@ -631,6 +698,6 @@ def main(url, entry, flag=1):   # flag确定是否重新下载
 
 
 if __name__ == '__main__':
-    l = 'https://www.amazon.com/gp/bestsellers/automotive/15737391/ref=pd_zg_hrsr_automotive_3_5_last'
-    d = 'https://www.amazon.co.uk/dp/B00GRIR87M'
+    l = 'https://www.amazon.fr/gp/bestsellers/electronics/ref=pd_dp_ts_electronics_1/258-1090267-6255050'
+    d = 'https://www.amazon.fr/dp/B00J7MXMLG'
     main(d, 'd', 1)
